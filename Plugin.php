@@ -114,7 +114,15 @@ class TpCache_Plugin implements Typecho_Plugin_Interface
 
         $list = array('关闭', '清除所有数据');
         $element = new Typecho_Widget_Helper_Form_Element_Radio('is_clean', $list, 0, '清除所有数据');
+         $form->addInput($element);
+         
+        //<meta name="renderer" content="webkit">
+        $list = array('关闭', '开启');
+        $element = new Typecho_Widget_Helper_Form_Element_Radio('is_show_key', $list, 0, '是否将KEY值放到缓存页面中');
         $form->addInput($element);
+        
+        
+       
     }
 
     /**
@@ -167,12 +175,13 @@ class TpCache_Plugin implements Typecho_Plugin_Interface
         // 前置条件检查
         if (!self::pre_check()) return false;
 
-
+        
 
         try {
             $data = self::get(self::$path);
             if ($data != false) {
                 $data = unserialize($data);
+                
                 //如果超时
                 if ($data['c_time'] + self::$plugin_config->expire <= time()) {
 
@@ -253,6 +262,7 @@ class TpCache_Plugin implements Typecho_Plugin_Interface
                 if (in_array($key, self::$plugin_config->cache_page)) {
                     if (self::$plugin_config->is_debug) echo "This page needs to be cached!\n" . '
 <a href="http://www.phpgao.com/tpcache_for_typecho.html" target="_blank"> Bug Report </a>';
+                    if(self::$plugin_config->is_show_key) echo  "<!--".self::g_md5(self::$path).">";
                     self::$path = $path;
                     return true;
                 }
@@ -274,10 +284,11 @@ class TpCache_Plugin implements Typecho_Plugin_Interface
         //若self::$key不为空，则使用缓存
         if (is_null(self::$key)) return;
 
-
+        //从输出流中取到所有的输出内容
         $html = ob_get_contents();
 
         if (!empty($html)) {
+            
             $data = array();
             $data['c_time'] = time();
             $data['html'] = $html;
@@ -408,28 +419,31 @@ class TpCache_Plugin implements Typecho_Plugin_Interface
         }
     }
 
-
+    public static function g_md5($path){
+        $prefix = self::$request->getUrlPrefix();
+        return md5($prefix . $path);
+    }
+    public static function f_md5($path){
+        
+        self::$key = self::g_md5($path);
+        return self::$key;
+    }
     public static function set($path, $data)
     {
 
         if (!is_null(self::$key)) return self::$cache->set(self::$key, $data);
-        $prefix = self::$request->getUrlPrefix();
-        self::$key = md5($prefix . $path);
-
-        return self::$cache->set(self::$key, $data);
+        return self::$cache->set(self::f_md5($path), $data);
     }
 
     public static function add($path, $data)
     {
 
     }
-
     public static function get($path)
     {
         if (!is_null(self::$key)) return self::$cache->get(self::$key);
-        $prefix = self::$request->getUrlPrefix();
-        self::$key = md5($prefix . $path);
-        return self::$cache->get(self::$key);
+        
+        return self::$cache->get(self::f_md5($path));
     }
 
     /**
